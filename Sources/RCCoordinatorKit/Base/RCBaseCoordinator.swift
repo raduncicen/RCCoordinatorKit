@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-public class RCBaseCoordinator<CoordinatorDelegate>: RCCoordinator {
+open class RCBaseCoordinator<CoordinatorDelegate>: RCCoordinator {
     
     public var navigationController: UINavigationController
     public var childCoordinators: [any RCCoordinator] = []
@@ -37,7 +37,7 @@ public class RCBaseCoordinator<CoordinatorDelegate>: RCCoordinator {
         self.navigationController = navigationController
     }
 
-    public func start(popUpTo identifier: String?) {
+    open func start(popUpTo identifier: String? = nil) {
         assertionFailure("Not implemented")
     }
 }

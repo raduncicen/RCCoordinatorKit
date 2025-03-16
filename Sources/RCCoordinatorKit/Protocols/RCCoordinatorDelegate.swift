@@ -11,7 +11,7 @@ public protocol RCCoordinatorDelegate: AnyObject {
 }
 
 
-extension RCCoordinatorDelegate {
+public extension RCCoordinatorDelegate {
     func removeChildCoordinator(with identifier: String?) {
         guard let parent = self as? (any RCCoordinator) else {
             assertionFailure("NavDelegate can only be assigned to an RCCoordinator")

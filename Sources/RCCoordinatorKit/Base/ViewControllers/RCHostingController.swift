@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-public class RCHostingController<Content: View>: UIHostingController<Content>, RCViewControllerProtocol {
+open class RCHostingController<Content: View>: UIHostingController<Content>, RCViewControllerProtocol {
     private weak var coordinator: RCCoordinator?
     public var isCoordinatorRoot: Bool = false
 
@@ -19,7 +19,7 @@ public class RCHostingController<Content: View>: UIHostingController<Content>, R
         super.init(rootView: rootView)
     }
 
-    required init?(coder aDecoder: NSCoder) {
+    required public init?(coder aDecoder: NSCoder) {
         fatalError("Story board not supported")
     }
 
