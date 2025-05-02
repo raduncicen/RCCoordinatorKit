@@ -38,6 +38,5 @@ final class <###Name###>DIContainer: BaseDIContainer {
         }
         .scope(.shared)
     }
-
 }
 ```

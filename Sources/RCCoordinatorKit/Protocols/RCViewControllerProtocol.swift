@@ -6,7 +6,7 @@
 //
 import UIKit
 
-public protocol RCViewControllerProtocol: AnyObject {
+public protocol RCViewControllerProtocol: UIViewController {
     var isCoordinatorRoot: Bool { get set }
     func handleSwipeDismissForCoordinator(coordinator: RCCoordinator?)
 }

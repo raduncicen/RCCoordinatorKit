@@ -8,13 +8,25 @@
 import SwiftUI
 
 
-public enum RCCoordinatorRootPresentationStyle {
+public enum RCCoordinatorRootPresentationStyle: Equatable {
+    /// Pushes the given `viewController` to the `navigationController`.of the coordinator
     case push
-    case present(_ modalPresentationStyle: UIModalPresentationStyle)
+    /// Embeds the given viewController inside a new NavigationController (a,k,a embeddedNavigationController inside the the `RCCoordinator`) and pushes that navigation controller to the navigationStack.
+    case pushInsideEmbeddedNavigationController
+    /// Embeds the given viewController inside a new NavigationController and presents the `embeddedNavigationController` on top of `navigationController` of `RCCoordinator`
+    case present(_ presentationOptions: PresentationOptions)
+
+
+    public struct PresentationOptions: Equatable {
+        var modalPresentationStyle: UIModalPresentationStyle = .pageSheet
+        var enableInteractiveDismiss: Bool = true
+    }
 }
 
 public protocol RCCoordinator: AnyObject {
     var navigationController: UINavigationController { get }
+    var embeddedNavigationController: UINavigationController? { get set }
+
     var childCoordinators: [RCCoordinator] { get set }
     var parent: RCCoordinatorDelegate? { get set }
     init(navigationController: UINavigationController)
@@ -66,8 +78,8 @@ public extension RCCoordinator {
         // Remove this coordinator from its parent
         self.parent?.removeChildCoordinator(with: identifier)
 
-        if let coordinator = self as? RCModallyPresentableCoordinator {
-            guard coordinator.localNavigationController?.identifier == identifier else {
+        if let embeddedNavigationController {
+            guard embeddedNavigationController.identifier == identifier else {
                 assertionFailure("Coordinator's localNavigationController does not match coordinator's rootViewControllerIdentifier")
                 navigationController.popViewControllers(upTo: identifier, animated: animated)
                 navigationController.dismiss(animated: animated)
@@ -86,48 +98,61 @@ public extension RCCoordinator {
 }
 
 extension RCCoordinator {
-    internal func presentAsRootLogic<Content: View>(
-        _ viewController: RCHostingController<Content>,
+    internal func presentAsRootLogic(
+        _ viewController: RCViewControllerProtocol,
         style: RCCoordinatorRootPresentationStyle = .push,
         popUpTo identifier: String? = nil,
         animated: Bool = true
     ) {
-        viewController.isCoordinatorRoot = true
-
-        let identifier = identifier ?? self.identifier
-        // If The the coordinator already has a root
-        if let identifier {
-            navigationController.setNavigationStack(
-                upTo: identifier,
-                include: true,
-                adding: viewController,
-                animated: animated,
-                completion: nil
-            )
-            matchCoordinatorIdWithRootViewController(viewController)
-            return
-        }
-
-        // If Coordinator just initialized
         switch style {
-        case .push:
-            matchCoordinatorIdWithRootViewController(viewController)
-            navigationController.pushViewController(viewController, animated: animated)
-        case .present(let modalPresentationStyle):
-            if let coordinator = self as? RCModallyPresentableCoordinator {
-                coordinator.startAsModalWithLocalNavigationController(
-                    viewController: viewController,
-                    modalPresentationStyle: modalPresentationStyle,
-                    animated: animated
+        case .push, .pushInsideEmbeddedNavigationController:
+            var viewController = (style == .pushInsideEmbeddedNavigationController)
+            ? embedRootInsideANavigationController(viewController: viewController)
+            : viewController
+
+            viewController.isCoordinatorRoot = true
+
+            let identifier = identifier ?? self.identifier
+
+            // If The the coordinator already has a root
+            if let identifier {
+                navigationController.setNavigationStack(
+                    upTo: identifier,
+                    include: true,
+                    adding: viewController,
+                    animated: animated,
+                    completion: nil
                 )
+                matchCoordinatorIdWithRootViewController(viewController)
                 return
             }
+            // If Coordinator just initialized
+            else {
+                matchCoordinatorIdWithRootViewController(viewController)
+                navigationController.pushViewController(viewController, animated: animated)
+            }
 
-            let embedInNavigationController = UINavigationController(rootViewController: viewController)
-            matchCoordinatorIdWithRootViewController(embedInNavigationController) // FIXME: BURAYI KONTROL ETMELISIN
-            navigationController.present(viewController, animated: animated)
+        case .present(let presentationOptions):
+            if let embeddedNavigationController, embeddedNavigationController.identifier == identifier {
+                embeddedNavigationController.setViewControllers([viewController], animated: animated)
+            } else {
+                let embeddedNavigationController = embedRootInsideANavigationController(viewController: viewController)
+                matchCoordinatorIdWithRootViewController(embeddedNavigationController)
+                embeddedNavigationController.modalPresentationStyle = presentationOptions.modalPresentationStyle
+                embeddedNavigationController.isModalInPresentation = !presentationOptions.enableInteractiveDismiss
+
+                let viewControllerToPresentOn = topViewController(of: navigationController) ?? navigationController
+                viewControllerToPresentOn.present(embeddedNavigationController, animated: animated)
+            }
         }
     }
+
+    private func embedRootInsideANavigationController(viewController: RCViewControllerProtocol) -> RCViewControllerProtocol {
+        let embeddedNavigationController = RCEmbeddedNavigationController(rootViewController: viewController, coordinator: self)
+        self.embeddedNavigationController = embeddedNavigationController
+        return embeddedNavigationController
+    }
+
 
 }
 
@@ -170,3 +195,43 @@ public extension RCCoordinator {
     }
 }
 
+// MARK: - TOOLS
+
+extension RCCoordinator {
+
+    public func topViewController(of viewController: UIViewController? = nil) -> UIViewController? {
+        guard let viewController else { return nil }
+
+        if let nav = viewController as? UINavigationController {
+            return topViewController(of: nav.visibleViewController)
+        }
+
+        if let tab = viewController as? UITabBarController {
+            if let selected = tab.selectedViewController {
+                return topViewController(of: selected)
+            }
+        }
+
+        if let presented = viewController.presentedViewController {
+            return topViewController(of: presented)
+        }
+
+        // Handle Split View Controller
+        if let split = viewController as? UISplitViewController {
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                // iPad için detay viewController'ı döndür
+                if let detailNav = split.viewControllers.last as? UINavigationController {
+                    return topViewController(of: detailNav.visibleViewController)
+                }
+                return topViewController(of: split.viewControllers.last)
+            }
+            // iPhone için primary viewController'ı döndür
+            if let primaryNav = split.viewControllers.first as? UINavigationController {
+                return topViewController(of: primaryNav.visibleViewController)
+            }
+            return topViewController(of: split.viewControllers.first)
+        }
+
+        return viewController
+    }
+}

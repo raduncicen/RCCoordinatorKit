@@ -8,8 +8,9 @@
 import SwiftUI
 
 open class RCBaseCoordinator<CoordinatorDelegate>: RCCoordinator {
-    
+
     public var navigationController: UINavigationController
+    public weak var embeddedNavigationController: UINavigationController?
     public var childCoordinators: [any RCCoordinator] = []
 
     weak private var weakParent: AnyObject?
@@ -41,3 +42,4 @@ open class RCBaseCoordinator<CoordinatorDelegate>: RCCoordinator {
         assertionFailure("Not implemented")
     }
 }
+
